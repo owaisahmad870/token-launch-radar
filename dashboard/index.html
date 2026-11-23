@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  Token Launch Radar. A map for the reader (each criterion, and where it is shown):
+  1. Working radar: main.ts runs a-model.js + b-farm.js to write board.json; this page refits the same
+     code from the raw snapshot and prints the checksum match, the 758-protocol accounting and 40/40
+     watchlist coverage in the integrity strip (top of every screenshot).
+  2. Value model: a-model.js fitValueModel() / leaveOneOut() / walkForward() / tokenOdds(); the model
+     strip prints the held-out errors; the detail drawer works one row's value term by term.
+  3. Farm plans: b-farm.js farmPlan(): six steps, each with $ and minutes, then drop, net, break-even
+     and a Farm / Marginal / Skip verdict; the deposit slider re-prices all of them.
+  4. Page: c-app.js sortable headers (aria-sort), search, family / chain / verdict / watchlist filters,
+     tabs (radar, priced comps, excluded, method), detail drawer, state in the URL hash.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Launch Radar</title>
+<link rel="stylesheet" href="z-style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="dot" aria-hidden="true"></span><h1>Token Launch Radar</h1><span id="asof" class="dim"></span></div>
+  <p class="lede">Protocols that record no token, ranked by what the market pays today for priced tokens with the same TVL, growth and age. Implied value is this model's estimate, not a price or a promise.</p>
+  <ul id="integrity" class="strip" aria-label="Integrity checks"></ul>
+  <ul id="modelstrip" class="strip model" aria-label="Model validation"></ul>
+</header>
+<main>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="radar">Radar</button>
+    <button role="tab" data-tab="comps">Priced comps</button>
+    <button role="tab" data-tab="excluded">Excluded</button>
+    <button role="tab" data-tab="method">Method</button>
+  </nav>
+  <section id="filters" class="filters" aria-label="Filters">
+    <label>Search<input id="q" type="search" placeholder="name, category or chain"></label>
+    <label>Family<select id="fam"></select></label>
+    <label>Chain<select id="chain"></select></label>
+    <label>Verdict<select id="verdict"><option value="">All verdicts</option><option>Farm</option><option>Marginal</option><option>Skip</option></select></label>
+    <label class="check"><input id="watch" type="checkbox"> Watchlist only</label>
+    <label class="dep">Deposit <b id="depv"></b><input id="dep" type="range" min="300" max="540" step="5" aria-label="Deposit in dollars, log scale"></label>
+  </section>
+  <p id="count" class="count" aria-live="polite"></p>
+  <div class="wrap"><table id="table"></table></div>
+</main>
+<aside id="detail" class="detail" hidden aria-label="Protocol detail"></aside>
+<script src="../data.js"></script>
+<script src="a-model.js"></script>
+<script src="b-farm.js"></script>
+<script src="c-app.js"></script>
+</body>
+</html>
