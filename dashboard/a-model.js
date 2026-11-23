@@ -240,7 +240,7 @@
     const compRows = comps.map((c, i) => ({
       slug: c.slug, name: c.name, category: c.p.category, family: c.f.fam, tvl_usd: c.p.tvl_usd, change_7d: c.p.change_7d,
       age_days: c.f.days, mcap_usd: c.p.mcap_usd, fitted_usd: Math.round(Math.pow(10, predictLog(fit, c.f))), loo_err: loo[i],
-    })).sort((a, b) => b.mcap_usd - a.mcap_usd || byStr(a.slug, b.slug));
+    })).sort((a, b) => b.tvl_usd - a.tvl_usd || byStr(a.slug, b.slug));
 
     const accounting = {
       total: snap.protocols.length, radar: groups.radar.length, comp: groups.comp.length, traded_cex: groups['traded-cex'].length,

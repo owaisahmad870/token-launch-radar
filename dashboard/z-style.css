@@ -64,7 +64,11 @@ tbody tr.sel { background: #2a2416; box-shadow: inset 3px 0 0 var(--amber); }
 .pill.Skip { background: rgba(240, 115, 109, 0.14); color: var(--red); }
 .bar { display: inline-block; width: 40px; height: 6px; margin-right: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--blue) var(--w), var(--line) var(--w)); vertical-align: middle; }
 caption { padding: var(--s3); text-align: left; }
-.scatter { width: 420px; height: auto; display: block; }
+.filters[hidden] { display: none; }
+.evidence { display: flex; gap: var(--s5); align-items: flex-start; }
+.evidence .score { width: 560px; }
+.evidence p { max-width: 560px; font-size: 12.5px; }
+.scatter { width: 480px; height: auto; display: block; flex: none; }
 .scatter circle { fill: var(--blue); fill-opacity: 0.75; }
 .scatter .diag { stroke: var(--amber); stroke-dasharray: 4 4; }
 .scatter text { fill: var(--dim); font: 10px var(--sans); }

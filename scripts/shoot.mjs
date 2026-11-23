@@ -11,11 +11,13 @@ const out = resolve(arg('--out', 'out'));
 const chrome = arg('--chrome', 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const page = pathToFileURL(join(out, 'dashboard', 'index.html')).href;
 
-// The three views the judge's prompt names: the board, a protocol's detail, a filtered view.
+// The three views the judge's prompt names (the board, a protocol's detail, a filtered view), then the
+// priced comps the model is fitted on.
 export const SHOTS = [
   ['1-board.png', 'tab=radar'],
   ['2-detail.png', 'tab=radar&open=steakhouse-financial'],
-  ['3-filtered.png', 'tab=radar&fam=Lending&verdict=Farm&sort=net&dir=-1&dep=25000&open=tydro'],
+  ['3-filtered.png', 'tab=radar&fam=Lending&verdict=Farm&sort=net&dir=-1&dep=25000'],
+  ['4-comps.png', 'tab=comps'],
 ];
 
 mkdirSync('screenshots', { recursive: true });

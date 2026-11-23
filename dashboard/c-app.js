@@ -113,17 +113,33 @@
 
   // Scatter of fitted vs actual market cap (log10), every priced comp: the model's fit at a glance.
   function scatter() {
-    const W = 360, H = 220, lo = 4, hi = 11, x = (v) => 30 + (v - lo) / (hi - lo) * (W - 40), y = (v) => H - 24 - (v - lo) / (hi - lo) * (H - 34);
-    const dots = R.comps.map((c) => `<circle cx="${x(Math.log10(c.fitted_usd)).toFixed(1)}" cy="${y(Math.log10(c.mcap_usd)).toFixed(1)}" r="3"><title>${esc(c.name)}</title></circle>`).join('');
+    const pts = R.comps.map((c) => [Math.log10(c.fitted_usd), Math.log10(c.mcap_usd), c.name]);
+    const all = pts.flatMap((p) => [p[0], p[1]]), lo = Math.floor(Math.min(...all)), hi = Math.ceil(Math.max(...all));
+    const W = 480, H = 270, x = (v) => 62 + (v - lo) / (hi - lo) * (W - 90), y = (v) => H - 30 - (v - lo) / (hi - lo) * (H - 52);
+    const ticks = [], tick = (t) => money(Math.pow(10, t)).replace('.00', '');
+    for (let t = lo; t <= hi; t++) ticks.push(`<text x="${x(t)}" y="${H - 16}" text-anchor="middle">${tick(t)}</text><text x="54" y="${y(t) + 3}" text-anchor="end">${tick(t)}</text>`);
+    const dots = pts.map((p) => `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="3"><title>${esc(p[2])}</title></circle>`).join('');
     return `<svg viewBox="0 0 ${W} ${H}" class="scatter" role="img" aria-label="Fitted versus actual market cap for ${R.comps.length} priced tokens">
-      <line x1="${x(lo)}" y1="${y(lo)}" x2="${x(hi)}" y2="${y(hi)}" class="diag"/>${dots}
-      <text x="${W / 2}" y="${H - 4}">fitted market cap (log10 $)</text><text x="4" y="12">actual</text></svg>`;
+      <line x1="${x(lo)}" y1="${y(lo)}" x2="${x(hi)}" y2="${y(hi)}" class="diag"/>${ticks.join('')}${dots}
+      <text x="${W / 2}" y="${H - 2}" text-anchor="middle">fitted market cap (dashed line: fitted = actual)</text><text x="4" y="10">actual market cap</text></svg>`;
+  }
+
+  // The held-out scorecard beside the scatter: the model against the naive multiple, same comps.
+  function scorecard() {
+    const pc = (x) => Math.round(x * 100) + '%', mult = R.comps.map((c) => c.mcap_usd / c.tvl_usd);
+    const fx = (m) => (m < 0.01 ? m.toPrecision(2) : m < 10 ? m.toFixed(2) : Math.round(m)) + '×';
+    return `<table class="mini score"><thead><tr><th>Held-out test (${V.n} priced tokens)</th><th class="num">Model</th><th class="num">Naive</th></tr></thead><tbody>
+      <tr><td>leaveOneOut() median error</td><td class="num up">${times(V.loo_mad)}</td><td class="num">${times(V.naive_mad)}</td></tr>
+      <tr><td>Within 2× of the real market cap</td><td class="num up">${pc(V.loo_within2x)}</td><td class="num">${pc(V.naive_within2x)}</td></tr>
+      <tr><td>walkForward() median error, ${V.wf_n} newest, fit on older only</td><td class="num up">${times(V.wf_mad)}</td><td class="num">–</td></tr>
+      <tr><td>P25–P75 band (LOO errors)</td><td class="num" colspan="2">${times(V.band_p25)} to ${times(V.band_p75)}</td></tr></tbody></table>
+      <p class="dim">Naive = every protocol at the median market cap / TVL. Errors are multiplicative: ×3 means off by a factor of 3 either way. The spread is wide because priced tokens themselves trade at ${fx(Math.min(...mult))} to ${fx(Math.max(...mult))} their TVL (median ${fx(M.quantile(mult, 0.5))}), so every row carries its band.</p>`;
   }
 
   function renderComps() {
-    $('#count').textContent = `${R.comps.length} protocols whose token trades: the comps the value model is fitted on (never ranked on the radar)`;
-    $('#table').innerHTML = `<caption>${scatter()}</caption><thead><tr><th>Protocol</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">Mcap / TVL</th><th class="num">Fitted</th><th class="num">LOO error</th><th>Family</th></tr></thead><tbody>${R.comps.map((c) =>
-      `<tr><td><b>${esc(c.name)}</b><small>${esc(c.category || '')}</small></td><td class="num">${money(c.tvl_usd)}</td><td class="num strong">${money(c.mcap_usd)}</td><td class="num">${(c.mcap_usd / c.tvl_usd).toFixed(2)}</td><td class="num">${money(c.fitted_usd)}</td><td class="num ${Math.abs(c.loo_err) <= 0.301 ? 'up' : 'dim'}">${times(c.loo_err)}</td><td>${esc(c.family)}</td></tr>`).join('')}</tbody>`;
+    $('#count').textContent = `${R.comps.length} protocols whose token trades: the comps the value model is fitted on (never ranked on the radar), largest TVL first`;
+    $('#table').innerHTML = `<caption><div class="evidence">${scatter()}<div>${scorecard()}</div></div></caption><thead><tr><th>Protocol</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">Mcap / TVL</th><th class="num">Fitted</th><th class="num">LOO error</th><th>Family</th></tr></thead><tbody>${R.comps.map((c) =>
+      `<tr><td><b>${esc(c.name)}</b><small>${esc(c.category || '')}</small></td><td class="num">${money(c.tvl_usd)}</td><td class="num strong">${money(c.mcap_usd)}</td><td class="num">${(c.mcap_usd / c.tvl_usd).toPrecision(2)}</td><td class="num">${money(c.fitted_usd)}</td><td class="num ${Math.abs(c.loo_err) <= 0.301 ? 'up' : 'dim'}">${times(c.loo_err)}</td><td>${esc(c.family)}</td></tr>`).join('')}</tbody>`;
   }
 
   function renderExcluded() {
