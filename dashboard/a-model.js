@@ -12,7 +12,7 @@
 (function (root) {
   'use strict';
 
-  const MODEL_VERSION = 'comps-ols-1';
+  const MODEL_VERSION = 'comps-huber-ridge-2';
   const DAY = 86400000;
   const RIDGE = 5, HUBER = 0.5;
   const GROWTH_MIN = -0.5, GROWTH_MAX = 1.0;

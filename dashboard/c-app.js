@@ -61,7 +61,7 @@
   // ---- columns: key, header, sort value, cell html
   const COLS = [
     { k: 'rank', h: '#', v: (r) => r.rank, c: (r) => `<td class="num rank">${r.rank}</td>` },
-    { k: 'name', h: 'Protocol', v: (r) => r.name.toLowerCase(), c: (r) => `<td><b>${esc(r.name)}</b>${r.watch ? '<span class="tag">watchlist</span>' : ''}<small>${esc(r.category || 'no category')} · ${esc(r.chains.slice(0, 2).join(', '))}${r.chains.length > 2 ? ' +' + (r.chains.length - 2) : ''}</small></td>` },
+    { k: 'name', h: 'Protocol', v: (r) => r.name.toLowerCase(), c: (r) => `<td><b>${esc(r.name)}</b>${r.watch ? '<span class="tag">watchlist</span>' : ''}<small>${esc(r.category || 'no category')} · ${esc(r.chains[0] || '')}${r.chains.length > 1 ? ' +' + (r.chains.length - 1) : ''}</small></td>` },
     { k: 'tvl', h: 'TVL', v: (r) => r.tvl_usd, c: (r) => `<td class="num">${money(r.tvl_usd)}</td>` },
     { k: 'g7', h: '7d', v: (r) => r.change_7d ?? -1e9, c: (r) => `<td class="num ${signCls(r.change_7d)}">${pct(r.change_7d)}</td>` },
     { k: 'age', h: 'No token for', v: (r) => r.age_days ?? -1, c: (r) => `<td class="num">${age(r.age_days)}</td>` },
@@ -69,6 +69,7 @@
     { k: 'band', h: 'P25–P75', v: (r) => r.p75_usd, c: (r) => `<td class="num dim">${money(r.p25_usd)}–${money(r.p75_usd)}</td>` },
     { k: 'odds', h: 'Token odds', v: (r) => r.token_odds, c: (r) => `<td class="num"><span class="bar" style="--w:${Math.round(r.token_odds * 100)}%"></span>${Math.round(r.token_odds * 100)}%</td>` },
     { k: 'net', h: 'Farm net', v: (r) => planOf(r).net, c: (r) => { const p = planOf(r); return `<td class="num"><span class="pill ${p.verdict}">${p.verdict}</span> <span class="${p.net >= 0 ? 'up' : 'down'}">${money(p.net)}</span></td>`; } },
+    { k: 'plan', h: 'Plan', v: (r) => planOf(r).minutes, c: (r) => { const p = planOf(r); return `<td class="num dim">${p.steps.length} steps · ${p.minutes}m</td>`; } },
     { k: 'be', h: 'Break-even', v: (r) => planOf(r).breakEven, c: (r) => `<td class="num dim">${money(planOf(r).breakEven)}</td>` },
   ];
 
@@ -82,13 +83,18 @@
     return rows.sort((a, b) => { const x = col.v(a), y = col.v(b); return (x < y ? -1 : x > y ? 1 : 0) * state.dir || a.rank - b.rank; });
   }
 
+  const CLASS_NAME = { evm: 'EVM: approve + deposit', onetx: 'one signed transaction', ledger: 'trustline first', hl: "via Hyperliquid's bridge", btc: 'BTC position', app: "the app's own flow" };
+
   // ---- strips
   function renderStrips() {
     $('#integrity').innerHTML = [
       `<span class="ok">${A.total} protocols accounted</span> ${A.radar} ranked pre-token + ${A.comp} priced comps + ${A.traded_cex} CEX tokens + ${A.token_unpriced} tokens with no price + ${A.excluded} excluded = ${A.radar + A.comp + A.traded_cex + A.token_unpriced + A.excluded}`,
       `<span class="ok">watchlist ${A.watch_covered}/${A.watch_total}</span>`,
       `<span class="${matches ? 'ok' : 'bad'}">${matches ? 'page refit = board.json' : 'MISMATCH with board.json'}</span> checksum ${pageSum} (board.json ${esc(BOARD.checksum || 'missing')}), ${R.rows.length} rows, ranks 1–${R.rows.length}, refit ${refitMs} ms`,
+      `<span class="${BOARD.text_whole ? 'ok' : 'bad'}">source ${BOARD.src_files} files, ${BOARD.src_bytes} bytes</span> dossier text ${BOARD.text_bytes} of 65536 bytes, ${BOARD.text_whole ? 'nothing cut' : 'CUT'}`,
     ].map((s) => `<li>${s}</li>`).join('');
+    const C = F.planCensus(R.rows, state.dep);
+    $('#farmstrip').innerHTML = `<li><b>farmPlan()</b> ${C.steps} steps over ${C.rows} rows, ${C.priced} of them with $ and minutes</li><li>${C.shapes} plan shapes from family × chain class</li><li>${C.minMin}–${C.maxMin} min of work per plan at ${money(state.dep)}</li>`;
     $('#modelstrip').innerHTML = [
       `<b>fitValueModel()</b> on ${V.n} priced tokens`,
       `<b>leaveOneOut()</b> median error ${times(V.loo_mad)} vs naive multiple ${times(V.naive_mad)}`,
@@ -158,7 +164,8 @@
       <tr><td>7-day growth (÷100, clamped −50%..+100%)</td><td class="num">${b[2].toFixed(3)}</td><td class="num">+100% = ${times(b[2])}</td></tr>
       <tr><td>log10(1 + years tracked), centred</td><td class="num">${b[3].toFixed(3)}</td><td class="num">2 y vs 0.5 y = ${times(b[3] * (Math.log10(3) - Math.log10(1.5)))}</td></tr>${fam}
       <tr><td>Validation: leave-one-out / naive / walk-forward median error</td><td class="num" colspan="2">${times(V.loo_mad)} / ${times(V.naive_mad)} / ${times(V.wf_mad)}</td></tr>
-      <tr><td>Farm assumptions (not in the snapshot)</td><td colspan="2">gas per chain table, ${F.SEASON_DAYS}-day season, ${F.FARMER_SHARE * 100}% of value to depositors, your time at $20/h</td></tr>
+      <tr><td>Farm assumptions (not in the snapshot)</td><td colspan="2">gas per chain table, ${F.SEASON_DAYS}-day season, ${F.FARMER_SHARE * 100}% of value to depositors, your time at $${F.HOUR_USD}/h</td></tr>
+      <tr><td>Farm plan shape</td><td colspan="2">family sets the steps (Trading: weekly volume or LP rebalance; Lending, Vaults, RWA: held balance; Infra: staked asset); chain class sets the transactions (${Object.values(CLASS_NAME).join('; ')})</td></tr>
       <tr><td>Unknown listing date</td><td colspan="2">takes the comps' median age, ${R.median_age_days} days, and the row shows "unknown"</td></tr></tbody>`;
   }
 
@@ -174,13 +181,13 @@
       <p class="eyebrow">Rank ${r.rank} of ${R.rows.length}${r.watch ? ' · on the watchlist' : ''} · records no token</p>
       <h2>${esc(r.name)}</h2><p class="sub">${esc(r.category || 'no category')} · ${esc(r.family)} · ${esc(r.chains.join(', '))}</p>
       <div class="kpis"><div><small>Implied value</small><b>${money(r.implied_value_usd)}</b></div><div><small>P25–P75</small><b>${money(r.p25_usd)}–${money(r.p75_usd)}</b></div><div><small>Token odds</small><b>${Math.round(r.token_odds * 100)}%</b></div></div>
-      <h3>impliedValue(), worked from the snapshot</h3>
+      <h3>valueTerms(): the implied value, worked from the snapshot</h3>
       <table class="mini"><thead><tr><th>Term</th><th class="num">×</th><th class="num">Running</th><th>Input</th></tr></thead><tbody>
       <tr><td>Typical priced comp</td><td class="num"></td><td class="num">${money(base)}</td><td class="dim">fit on ${V.n} tokens</td></tr>
       ${step('TVL', t.tvl, money(r.tvl_usd))}${step('7-day growth', t.growth, pct(r.change_7d))}${step('Time with no token', t.age, age(r.age_days))}${step('Family', t.family, esc(r.family))}
       </tbody></table>
       <p class="dim">= ${money(r.implied_value_usd)}, the value board.json carries for rank ${r.rank}. Nearest priced comps: ${r.peers.map((c) => `${esc(c.name)} (TVL ${money(c.tvl_usd)}, mcap ${money(c.mcap_usd)})`).join('; ')}.</p>
-      <h3>farmPlan() at ${money(p.deposit)} on ${esc(p.chain)} <span class="pill ${p.verdict}">${p.verdict}</span></h3>
+      <h3>farmPlan() at ${money(p.deposit)} on ${esc(p.chain)} (${CLASS_NAME[p.cls]}), ${esc(p.asset)} <span class="pill ${p.verdict}">${p.verdict}</span></h3>
       <table class="mini"><thead><tr><th>Step</th><th>Do</th><th class="num">Cost</th><th class="num">Time</th></tr></thead><tbody>
       ${p.steps.map((s) => `<tr><td>${s.step}</td><td>${esc(s.do)}</td><td class="num">${money(s.usd)}</td><td class="num">${s.min} min</td></tr>`).join('')}
       <tr class="tot"><td>Total</td><td>${p.minutes} min of work at $20/h + ${money(p.cash)} cash, over ${p.days} days</td><td class="num">${money(p.cost)}</td><td class="num">${p.minutes} min</td></tr></tbody></table>
@@ -190,6 +197,7 @@
   // ---- render everything from state
   function render() {
     writeHash();
+    renderStrips();
     document.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
     $('#filters').hidden = state.tab !== 'radar';
     $('#q').value = state.q; $('#fam').value = state.fam; $('#chain').value = state.chain; $('#verdict').value = state.verdict;
@@ -203,7 +211,6 @@
     $('#asof').textContent = `DefiLlama snapshot ${SNAP.as_of} · model ${R.version}`;
     $('#fam').innerHTML = '<option value="">All families</option>' + families.map((f) => `<option>${esc(f)}</option>`).join('');
     $('#chain').innerHTML = '<option value="">All chains</option>' + chains.map((c) => `<option>${esc(c)}</option>`).join('');
-    renderStrips();
     document.addEventListener('click', (e) => {
       const t = e.target.closest('[data-sort],[data-tab],[data-close],tr[data-slug]');
       if (!t) return;

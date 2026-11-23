@@ -79,8 +79,6 @@ if (rows[0].implied_value_usd === rows[rows.length - 1].implied_value_usd) fail(
 mkdirSync(out, { recursive: true });
 const checksum = RadarModel.boardChecksum(rows);
 writeFileSync(join(out, 'board.json'), JSON.stringify({ model: radar.version, as_of: radar.as_of, checksum, rows }) + '\n');
-// data.js: the raw snapshot (the page refits the model from it) and board.json's checksum to match against.
-writeFileSync(join(out, 'data.js'), `window.RADAR_SNAPSHOT=${JSON.stringify(snapshot)};\nwindow.RADAR_BOARD=${JSON.stringify({ checksum, rows: rows.length })};\n`);
 
 function copyFiles(from: string, to: string): string[] {
   mkdirSync(to, { recursive: true });
@@ -92,7 +90,20 @@ copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
 const shots = copyFiles(join(here, 'screenshots'), join(out, 'screenshots'));
 if (shots.length < 3 || shots.length > 4) fail(`screenshots/ holds ${shots.length} images, not 3 or 4`);
 
-writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: 65_536, screenshots: { max: 4, max_bytes: 524_288 }, dashboard: { max_files: 400, max_bytes: 4_194_304 } }));
+const dossier = buildDossier(out, { text_max_bytes: 65_536, screenshots: { max: 4, max_bytes: 524_288 }, dashboard: { max_files: 400, max_bytes: 4_194_304 } });
+writeFileSync(join(out, 'dossier.json'), dossier);
+
+// data.js sits outside dashboard/, so it is not in the dossier: written after it, it can state the dossier's
+// own text size. It also carries the raw snapshot (the page refits the model) and board.json's checksum.
+const text: string = JSON.parse(Buffer.from(dossier).toString('utf8')).text;
+const dash = readdirSync(join(out, 'dashboard'));
+const source = {
+  checksum, rows: rows.length, src_files: dash.length,
+  src_bytes: dash.reduce((s, n) => s + statSync(join(out, 'dashboard', n)).size, 0),
+  text_bytes: Buffer.byteLength(text), text_whole: !text.includes('[Cut at '), // buildDossier's cut line
+
+};
+writeFileSync(join(out, 'data.js'), `window.RADAR_SNAPSHOT=${JSON.stringify(snapshot)};\nwindow.RADAR_BOARD=${JSON.stringify(source)};\n`);
 
 const a = radar.accounting;
 process.stdout.write(`token radar: ${a.total} protocols = ${a.radar} ranked + ${a.comp} priced comps + ${a.traded_cex} CEX tokens + ${a.token_unpriced} unpriced tokens + ${a.excluded} excluded; watchlist ${a.watch_covered}/${a.watch_total}; checksum ${checksum}\n`);

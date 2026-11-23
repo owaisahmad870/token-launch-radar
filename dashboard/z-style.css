@@ -23,8 +23,8 @@ button, input, select { font: inherit; color: inherit; }
 .brand .dim { font-size: 12px; font-family: var(--mono); }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px rgba(240, 176, 60, 0.18); }
 .lede { margin: var(--s1) 0 var(--s2); color: var(--dim); max-width: 980px; }
-.strip { list-style: none; margin: var(--s1) 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s4); font: 12px/1.5 var(--mono); color: var(--dim); }
-.strip li + li::before { content: "\00b7"; margin-right: var(--s4); color: var(--line); }
+.strip { list-style: none; margin: var(--s1) 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); font: 12px/1.5 var(--mono); color: var(--dim); }
+.strip li { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 1px 8px; }
 .strip .ok { color: var(--green); }
 .strip .ok::before { content: "\2713"; margin-right: 6px; }
 .strip .bad { color: var(--red); font-weight: 700; }
