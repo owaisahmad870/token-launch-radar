@@ -9,7 +9,7 @@
 // Family -> what keeps the position counted:
 //   Trading: weekly volume (perps: open + close a hedged pair; DEX: rebalance the LP range)
 //   Lending, Vaults, RWA & stables: balance held for the season, checked monthly
-//   Infra: the chain's own asset staked; unstaking waits the protocol's stated unbonding period
+//   Infra: staking categories stake the chain's asset (unbonding wait); a Chain row bridges USDC in and lends it
 //
 // ASSUMPTIONS (not in the snapshot; the same for every row, printed on the page):
 //   GAS_USD per chain, SEASON_DAYS 90, FARMER_SHARE 5% of the token's value to depositors,
@@ -37,6 +37,9 @@
   const LEDGER = new Set(['Stellar', 'Ripple', 'Algorand']);
   const BTC_CHAINS = new Set(['Bitcoin', 'Stacks']);
   const BTC_CATEGORIES = new Set(['Anchor BTC', 'Decentralized BTC', 'Restaked BTC']);
+  // Categories whose position is a staked asset, or a minted yield asset (with issuer onboarding).
+  const STAKE_CATEGORIES = new Set(['Staking Pool', 'Restaking', 'Liquid Staking', 'Liquid Restaking']);
+  const MINT_CATEGORIES = new Set(['RWA', 'Stablecoin Wrapper', 'Dual-Token Stablecoin']);
   const DEFAULT_GAS = 0.3;
   const SEASON_DAYS = 90, WEEKS = 13, MONTHS = 3;
   const FARMER_SHARE = 0.05, HOUR_USD = 20, PERP_FEE = 0.0005, SWAP_FEE = 0.003;
@@ -59,7 +62,8 @@
   // farmPlan: one row and one deposit in; the plan's steps {step, do, usd, min}, totals and verdict out.
   function farmPlan(row, deposit) {
     const d = deposit || DEFAULT_DEPOSIT, { chain, gas, cls } = cheapestChain(row.chains), n = row.name;
-    const btc = cls === 'btc' || BTC_CATEGORIES.has(row.category), asset = btc ? 'BTC' : row.family === 'Infra' ? `${chain}'s staking asset` : 'USDC';
+    const c = row.category, stake = row.family === 'Infra' && STAKE_CATEGORIES.has(c), mint = MINT_CATEGORIES.has(c);
+    const btc = cls === 'btc' || BTC_CATEGORIES.has(c), asset = btc ? 'BTC' : stake ? `${chain}'s staking asset` : 'USDC';
     const steps = [], add = (step, text, cost, min) => steps.push({ step, do: text, usd: cost, min });
     const fundFee = chain === 'Ethereum' || btc ? 4 : 1;
 
@@ -73,7 +77,7 @@
     }
     if (cls === 'ledger') add('Trustline', `Add the USDC trustline (opt-in) to the wallet before funds arrive; the chain locks a small reserve.`, 0.5, 5);
     if (asset.endsWith('staking asset')) add('Swap', `Swap the USDC to ${asset} on a DEX on ${chain}.`, d * SWAP_FEE + gas, 5);
-    if (row.family === 'RWA & stables') add('Onboard', `Complete ${n}'s issuer onboarding (KYC or wallet whitelist) if its app asks for it before minting.`, 0, 30);
+    if (mint) add('Onboard', `Complete ${n}'s issuer onboarding (KYC or wallet whitelist) if its app asks for it before minting.`, 0, 30);
 
     // 2. The entry, by family; transactions by chain class.
     const tx = cls === 'evm' ? 2 : 1;
@@ -88,17 +92,21 @@
       add('Enter', `Deposit ${usd(d)} USDC into ${n} on ${chain}.${how}`, tx * gas, 10);
       add('Activity', `Each week, make one trade of about ${usd(d / 10)} so the account shows use, not only a balance.`, WEEKS * (d / 10 * SWAP_FEE + gas), WEEKS * 5);
     } else {
-      const verb = row.family === 'Lending' ? `Supply ${usd(d)} ${asset} to ${n}'s main market on ${chain}; borrow nothing, so nothing can be liquidated.`
+      const verb = c === 'CDP' || c === 'CDP Manager' ? `Lock ${usd(d)} of collateral ${n} accepts on ${chain}, mint its stablecoin at under 40% loan-to-value, and hold it.`
+        : c === 'Collateral Markets' || c === 'Collateral Management' ? `Deposit ${usd(d)} of an asset ${n}'s vaults accept on ${chain} and keep the receipt.`
+        : c === 'Chain' ? `Supply the ${usd(d)} ${asset} now on ${chain} to the largest lending market there, so the chain's own activity counts it.`
+        : c === 'Payments' ? `Fund a ${n} wallet or channel with ${usd(d)} ${asset} on ${chain}; make one small payment a month.`
+        : row.family === 'Lending' ? `Supply ${usd(d)} ${asset} to ${n}'s main market on ${chain}; borrow nothing, so nothing can be liquidated.`
         : row.family === 'Vaults' ? `Deposit ${usd(d)} ${asset} into ${n}'s largest ${asset} vault on ${chain} and keep the shares.`
-        : row.family === 'RWA & stables' ? `Mint or buy ${usd(d)} of ${n}'s yield-bearing asset with USDC on ${chain} and hold it.`
-        : row.family === 'Infra' ? `Stake ${usd(d)} of ${asset} through ${n} on ${chain} and keep the receipt.`
+        : mint ? `Mint or buy ${usd(d)} of ${n}'s yield-bearing asset with USDC on ${chain} and hold it.`
+        : stake ? `Stake ${usd(d)} of ${asset} through ${n} on ${chain} and keep the receipt.`
         : `Deposit ${usd(d)} ${asset} into ${n}'s app on ${chain} and keep the position open.`;
       add('Enter', verb + how, tx * gas, 10);
       add('Hold', `Hold the balance for the ${SEASON_DAYS}-day season; once a month, check ${n}'s app for a points or rewards balance and log it.`, 0, MONTHS * 5);
     }
 
     // 3. Out, and the claim.
-    const wait = row.family === 'Infra' ? ` Unstaking waits the protocol's stated unbonding period.` : row.family === 'Vaults' ? ' Some vaults queue withdrawals for days.' : '';
+    const wait = stake ? ` Unstaking waits the protocol's stated unbonding period.` : row.family === 'Vaults' ? ' Some vaults queue withdrawals for days.' : '';
     const back = asset.endsWith('staking asset') || row.category === 'Dexs' ? ', swap back to USDC' : '';
     add('Exit', `Withdraw the position${back} and send the ${btc ? 'BTC' : 'USDC'} back to the exchange.${wait}`, tx * gas + fundFee + (back ? d * SWAP_FEE : 0), 15);
     add('Claim', `If a token is announced, claim only through the link on ${n}'s own site; never sign a transfer to claim.`, gas, 10);

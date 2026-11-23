@@ -249,7 +249,19 @@
     };
     const excluded = groups.excluded.map((p) => ({ slug: p.slug, name: p.name, tvl_usd: p.tvl_usd, reason: exclusionReason(p) }))
       .sort((a, b) => b.tvl_usd - a.tvl_usd || byStr(a.slug, b.slug));
-    return { version: MODEL_VERSION, as_of: asOf, median_age_days: medianAge, fit, odds_w: oddsW, validation, accounting, rows: scored, comps: compRows, excluded };
+    return { version: MODEL_VERSION, as_of: asOf, fitRows: comps, median_age_days: medianAge, fit, odds_w: oddsW, validation, accounting, rows: scored, comps: compRows, excluded };
+  }
+
+  // termTests: each term's held-out worth. Refit with the term neutralised (growth 0, one age for all,
+  // one family for all) and compare leaveOneOut() and walkForward() median errors with the full model's.
+  // Positive delta = the model is worse without the term. Run by the page (Priced comps tab), not main.ts.
+  function termTests(rows) {
+    const mad = (e) => quantile(e.map(Math.abs), 0.5);
+    const score = (cs) => ({ loo: mad(leaveOneOut(cs)), wf: mad(walkForward(cs).err) });
+    const full = score(rows);
+    const drop = (k, f) => { const s = score(rows.map((c) => Object.assign({}, c, { f: Object.assign({}, c.f, f(c.f)) }))); return { term: k, loo: s.loo, wf: s.wf, dLoo: s.loo - full.loo, dWf: s.wf - full.wf }; };
+    const meanLt = rows.reduce((s, c) => s + c.f.lt, 0) / rows.length;
+    return { full, tests: [drop('TVL', () => ({ lt: meanLt })), drop('7-day growth', () => ({ g: 0 })), drop('time with no token', () => ({ a: 0 })), drop('family', () => ({ fam: 'Other' }))] };
   }
 
   // boardChecksum: FNV-1a over "rank:slug:value" of every row. main.ts stores the one it wrote into
@@ -261,6 +273,6 @@
     return ('0000000' + h.toString(16)).slice(-8);
   }
 
-  const RadarModel = { MODEL_VERSION, boardChecksum, FAMILY, EXCLUDED_CATEGORIES, ageDays, classify, exclusionReason, features, fitValueModel, leaveOneOut, walkForward, naiveMultiple, fitTokenOdds, tokenOdds, nearestComps, quantile, buildRadar };
+  const RadarModel = { MODEL_VERSION, boardChecksum, termTests, FAMILY, EXCLUDED_CATEGORIES, ageDays, classify, exclusionReason, features, fitValueModel, leaveOneOut, walkForward, naiveMultiple, fitTokenOdds, tokenOdds, nearestComps, quantile, buildRadar };
   if (typeof module === 'object' && module.exports) module.exports = RadarModel; else root.RadarModel = RadarModel;
 })(typeof window !== 'undefined' ? window : globalThis);

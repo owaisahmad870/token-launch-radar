@@ -2,7 +2,7 @@
 // same call main.ts made), checks its checksum against board.json's, then renders: the integrity strip,
 // the model strip, four tabs (radar, priced comps, excluded, method), sortable headers, filters, a
 // deposit slider that re-prices every farm plan, and a detail drawer per protocol.
-// All state lives in the URL hash, so every screenshot is a reproducible link (see captureState).
+// All state lives in the URL hash, so every screenshot is a reproducible link.
 (function () {
   'use strict';
   const M = window.RadarModel, F = window.FarmModel, SNAP = window.RADAR_SNAPSHOT, BOARD = window.RADAR_BOARD || {};
@@ -139,12 +139,26 @@
       <tr><td>Within 2× of the real market cap</td><td class="num up">${pc(V.loo_within2x)}</td><td class="num">${pc(V.naive_within2x)}</td></tr>
       <tr><td>walkForward() median error, ${V.wf_n} newest, fit on older only</td><td class="num up">${times(V.wf_mad)}</td><td class="num">–</td></tr>
       <tr><td>P25–P75 band (LOO errors)</td><td class="num" colspan="2">${times(V.band_p25)} to ${times(V.band_p75)}</td></tr></tbody></table>
-      <p class="dim">Naive = every protocol at the median market cap / TVL. Errors are multiplicative: ×3 means off by a factor of 3 either way. The spread is wide because priced tokens themselves trade at ${fx(Math.min(...mult))} to ${fx(Math.max(...mult))} their TVL (median ${fx(M.quantile(mult, 0.5))}), so every row carries its band.</p>`;
+      <p class="dim">Naive = every protocol at the median market cap / TVL. Errors are multiplicative. Priced tokens themselves trade at ${fx(Math.min(...mult))} to ${fx(Math.max(...mult))} their TVL (median ${fx(M.quantile(mult, 0.5))}), so every row carries its band.</p>`;
+  }
+
+  // termTests(), run here (about a second): each term dropped in turn, both held-out tests re-run, and
+  // the term's effect across the 198 board rows. The verdict text follows from the two deltas alone.
+  let TT = null;
+  function termTable() {
+    TT = TT || M.termTests(R.fitRows);
+    const key = { 'TVL': 'tvl', '7-day growth': 'growth', 'time with no token': 'age', 'family': 'family' }, coef = { tvl: R.fit.beta[1], growth: R.fit.beta[2], age: R.fit.beta[3] };
+    const d = (x) => `<span class="${x > 0 ? 'up' : 'down'}">${x > 0 ? '+' : ''}${x.toFixed(3)}</span>`;
+    const verdict = (t) => (t.dLoo > 0 && t.dWf > 0 ? 'helps both tests' : t.dLoo <= 0 && t.dWf <= 0 ? 'no held-out gain; kept small' : 'mixed: helps one test only');
+    return `<table class="mini score"><thead><tr><th>termTests(): term dropped</th><th class="num">Coef</th><th class="num">Effect on board</th><th class="num">Δ LOO</th><th class="num">Δ WF</th><th>Verdict</th></tr></thead><tbody>${TT.tests.map((t) => {
+      const k = key[t.term], m = R.rows.map((r) => Math.pow(10, r.terms[k]));
+      return `<tr><td>${t.term}</td><td class="num">${k in coef ? coef[k].toFixed(3) : 'per family'}</td><td class="num">×${Math.min(...m).toFixed(2)}–${Math.max(...m).toFixed(2)}</td><td class="num">${d(t.dLoo)}</td><td class="num">${d(t.dWf)}</td><td>${verdict(t)}</td></tr>`;
+    }).join('')}</tbody></table><p class="dim">Δ = median error (dex) without the term minus with it; positive means the term helps. Growth and age are the rubric's inputs and stay in, at the small size the comps support.</p>`;
   }
 
   function renderComps() {
     $('#count').textContent = `${R.comps.length} protocols whose token trades: the comps the value model is fitted on (never ranked on the radar), largest TVL first`;
-    $('#table').innerHTML = `<caption><div class="evidence">${scatter()}<div>${scorecard()}</div></div></caption><thead><tr><th>Protocol</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">Mcap / TVL</th><th class="num">Fitted</th><th class="num">LOO error</th><th>Family</th></tr></thead><tbody>${R.comps.map((c) =>
+    $('#table').innerHTML = `<caption><div class="evidence">${scatter()}<div>${scorecard()}${termTable()}</div></div></caption><thead><tr><th>Protocol</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">Mcap / TVL</th><th class="num">Fitted</th><th class="num">LOO error</th><th>Family</th></tr></thead><tbody>${R.comps.map((c) =>
       `<tr><td><b>${esc(c.name)}</b><small>${esc(c.category || '')}</small></td><td class="num">${money(c.tvl_usd)}</td><td class="num strong">${money(c.mcap_usd)}</td><td class="num">${(c.mcap_usd / c.tvl_usd).toPrecision(2)}</td><td class="num">${money(c.fitted_usd)}</td><td class="num ${Math.abs(c.loo_err) <= 0.301 ? 'up' : 'dim'}">${times(c.loo_err)}</td><td>${esc(c.family)}</td></tr>`).join('')}</tbody>`;
   }
 

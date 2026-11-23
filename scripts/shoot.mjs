@@ -15,7 +15,7 @@ const page = pathToFileURL(join(out, 'dashboard', 'index.html')).href;
 // priced comps the model is fitted on.
 export const SHOTS = [
   ['1-board.png', 'tab=radar'],
-  ['2-detail.png', 'tab=radar&open=steakhouse-financial'],
+  ['2-detail.png', 'tab=radar&sort=value&dir=-1&open=august-digital'],
   ['3-filtered.png', 'tab=radar&fam=Lending&verdict=Farm&sort=net&dir=-1&dep=25000'],
   ['4-comps.png', 'tab=comps'],
 ];
